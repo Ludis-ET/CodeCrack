@@ -1,21 +1,39 @@
 import { useAuth } from "../../context";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 export const Links = () => {
-  const { data } = useAuth();
+  const { data, user } = useAuth();
   const [repos, setRepos] = useState([]);
+  const db = getFirestore();
+
+  console.log(data, user);
 
   useEffect(() => {
     if (data) {
       const fetchRepos = async () => {
-        const response = await axios.get(data.repos_url);
+        const response = await axios.get(
+          `https://api.github.com/users/${data.screenName}/repos`
+        );
         setRepos(response.data);
+
+        const linkedRepoDoc = doc(db, "users", data.localId);
+        const linkedRepoSnapshot = await getDoc(linkedRepoDoc);
+
+        if (!linkedRepoSnapshot.exists()) {
+          await setDoc(linkedRepoDoc, {
+            linkedRepos: response.data.map((repo) => ({
+              name: repo.name,
+              url: repo.html_url,
+            })),
+          });
+        }
       };
       fetchRepos();
     }
-  }, [data]);
+  }, [data, db]);
 
   const commitReadme = async (repoName) => {
     const functions = getFunctions();
